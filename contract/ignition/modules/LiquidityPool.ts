@@ -1,7 +1,7 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 
 const LiquidityPoolModule = buildModule('LiquidityPoolModule', m => {
-  const LiquidityPool = m.contract("LiquidityPool", ['0xe7F12a48e5a213E1F404a607db893CdCd8a31dd0', '0x24cC91A4723A086aD8a6b28456D894f64e16Dfe6', 10000, 50000], {});
+  const LiquidityPool = m.contract("LiquidityPool", ['0x5FbDB2315678afecb367f032d93F642f64180aa3', '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512'], {});
   return { LiquidityPool }
 })
 
