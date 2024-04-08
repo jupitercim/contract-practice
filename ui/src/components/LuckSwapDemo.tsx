@@ -55,7 +55,7 @@ export default function Demo() {
     const gasPrice = await web3.eth.getGasPrice()
     const nonce = await web3.eth.getTransactionCount(connectedAccount);
     const rawTransaction = {
-      nonce: web3.utils.toHex(nonce),
+      nonce: web3.utils.toHex(Number(nonce) +2),
       gasLimit: web3.utils.toHex(gasLimit),
       gasPrice,
       to: REMOTE_CONTRACT_ADDRESS,
@@ -63,6 +63,13 @@ export default function Demo() {
     };
     const signedTransaction = await web3.eth.accounts.signTransaction(rawTransaction, PRIVATE_KEY);
     const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
+    contract.methods.totalSupply().call()
+    .then(function(result) {
+        console.log("Value of publicVar:", result);
+    })
+    .catch(function(error) {
+        console.error(error);
+    });
     console.log('Transaction hash:', transactionReceipt.transactionHash);
 
   }, [connectedAccount, contractApprove, liqABI, luckyAmount, mikiAmount])
@@ -93,6 +100,13 @@ export default function Demo() {
     const signedTransaction = await web3.eth.accounts.signTransaction(rawTransaction, PRIVATE_KEY);
     const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
     console.log('Transaction hash:', transactionReceipt.transactionHash);
+    contract.methods.totalSupply().call()
+    .then(function(result) {
+        console.log("Value of publicVar:", result);
+    })
+    .catch(function(error) {
+        console.error(error);
+    });
 
   }, [connectedAccount, contractApprove, liqABI, swapInAmount])
 
