@@ -35,8 +35,8 @@ export default function Demo() {
 
   const updatePoolData = useCallback( async (contract: Contract<any>) => {
     const [luckyAmount, mikiAmount, totalAmount] = await Promise.all([
-      contract.methods.tokenAmount().call(),
-      contract.methods.tokenBmount().call(),
+      contract.methods.reserve0().call(),
+      contract.methods.reserve1().call(),
       contract.methods.totalSupply().call()
     ])
     setPoolData({
@@ -85,6 +85,7 @@ export default function Demo() {
     const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
     console.log('Transaction hash:', transactionReceipt.transactionHash);
     updatePoolData(contract)
+    contract.methods.sync().call()
 
   }, [connectedAccount, contractApprove, liqABI, luckyAmount, mikiAmount, updatePoolData])
 
@@ -136,10 +137,11 @@ export default function Demo() {
       }
       const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
       const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
-      const outAmount = await contract.methods.calculateSwapAmount(LUCKY_ADDRESS, swapLuckyInAmount).call()
+      const { 0: outAmount, 1: feeAMount } = await contract.methods.calculateSwapAmount(LUCKY_ADDRESS, swapLuckyInAmount).call()
+      console.log(outAmount, feeAMount,'outAmount')
       setSwapLuckyOutAmount(Number(outAmount as any).toString())
     }, 1000)
-  }, [liqABI, swapLuckyInAmount])
+  }, [liqABI, poolData, swapLuckyInAmount])
 
   useEffect(() => {
     clearTimeout(swapOutTimer.current)
@@ -150,10 +152,10 @@ export default function Demo() {
       }
       const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
       const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
-      const outAmount = await contract.methods.calculateSwapAmount(MIKI_ADDRESS, swapMikiInAmount).call()
+      const { 0: outAmount } = await contract.methods.calculateSwapAmount(MIKI_ADDRESS, swapMikiInAmount).call()
       setSwapMikiOutAmount(Number(outAmount as any).toString())
     }, 1000)
-  }, [liqABI, swapMikiInAmount])
+  }, [liqABI, poolData, swapMikiInAmount])
 
   useEffect(() => {
     const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
