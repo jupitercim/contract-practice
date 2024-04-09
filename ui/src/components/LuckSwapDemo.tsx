@@ -8,10 +8,17 @@ import * as LukABI from '@/../../contract/artifacts/contracts/LuckyToken.sol/Luc
 
 export default function Demo() {
   const [connectedAccount, setConnectedAccount] = useState('null');
-  const [swapInAmount, setSwapInAmount] = useState('')
-  const [swapOutAmount, setSwapOutAmount] = useState('')
+  const [swapLuckyInAmount, setSwapLuckyInAmount] = useState('')
+  const [swapMikiInAmount, setSwapMikiInAmount] = useState('')
+  const [swapLuckyOutAmount, setSwapLuckyOutAmount] = useState('')
+  const [swapMikiOutAmount, setSwapMikiOutAmount] = useState('')
   const [luckyAmount, setLuckyAmount] = useState('')
   const [mikiAmount, setMikiAmount] = useState('')
+  const [poolData, setPoolData] = useState({
+    luckyAmount: 0,
+    mikiAmount: 0,
+    totalAmount: 0
+  })
 
   const swapOutTimer = useRef<any>(null)
   const liqABI = (LiqABI as any).abi
@@ -24,6 +31,19 @@ export default function Demo() {
     } else {
       alert('Please download metamask');
     }
+  }, [])
+
+  const updatePoolData = useCallback( async (contract: Contract<any>) => {
+    const [luckyAmount, mikiAmount, totalAmount] = await Promise.all([
+      contract.methods.tokenAmount().call(),
+      contract.methods.tokenBmount().call(),
+      contract.methods.totalSupply().call()
+    ])
+    setPoolData({
+      luckyAmount: Number(luckyAmount),
+      mikiAmount: Number(mikiAmount),
+      totalAmount: Number(totalAmount)
+    })
   }, [])
 
   const contractApprove = useCallback(async() => {
@@ -63,66 +83,83 @@ export default function Demo() {
     };
     const signedTransaction = await web3.eth.accounts.signTransaction(rawTransaction, PRIVATE_KEY);
     const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
-    contract.methods.totalSupply().call()
-    .then(function(result) {
-        console.log("Value of publicVar:", result);
-    })
-    .catch(function(error) {
-        console.error(error);
-    });
     console.log('Transaction hash:', transactionReceipt.transactionHash);
+    updatePoolData(contract)
 
-  }, [connectedAccount, contractApprove, liqABI, luckyAmount, mikiAmount])
+  }, [connectedAccount, contractApprove, liqABI, luckyAmount, mikiAmount, updatePoolData])
 
-  const onSwapInChange = useCallback((ev: any) => {
-    setSwapInAmount(ev.target.value)
-    
-  }, [])
-
-  const swap = useCallback( async() => {
-    if (!swapInAmount) return 
+  const swap = useCallback( async(type: 'lucky' | 'miki') => {
+    if (!swapMikiInAmount && !swapLuckyInAmount) return 
+    const swapParam = {
+      lucky: {
+        from: LUCKY_ADDRESS,
+        to: MIKI_ADDRESS,
+        amount: swapLuckyInAmount
+      },
+      miki: {
+        from: MIKI_ADDRESS,
+        to: LUCKY_ADDRESS,
+        amount: swapMikiInAmount
+      }
+    }
     const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
     const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
     
-    const data = contract.methods.swap(connectedAccount, LUCKY_ADDRESS, MIKI_ADDRESS, swapInAmount).encodeABI()
+    const data = contract.methods.swap(connectedAccount, swapParam[type].from, swapParam[type].to, swapParam[type].amount).encodeABI()
     await contractApprove()
-    const gasLimit = await contract.methods.swap(connectedAccount, LUCKY_ADDRESS, MIKI_ADDRESS, swapInAmount).estimateGas({ from: connectedAccount })
+    // const gasLimit = await contract.methods.swap(connectedAccount, swapParam[type].from, swapParam[type].to, swapParam[type].amount).estimateGas({ from: connectedAccount })
+    const gasLimit = '500'
 
     const gasPrice = await web3.eth.getGasPrice()
     const nonce = await web3.eth.getTransactionCount(connectedAccount);
     const rawTransaction = {
-      nonce: web3.utils.toHex(nonce),
+      nonce: web3.utils.toHex(Number(nonce) + 2),
       gasLimit: web3.utils.toHex(gasLimit),
       gasPrice,
       to: REMOTE_CONTRACT_ADDRESS,
       data: data,
     };
+    console.log(rawTransaction, swapParam[type].from, swapParam[type].to, swapParam[type].amount, 'rawTransaction')
     const signedTransaction = await web3.eth.accounts.signTransaction(rawTransaction, PRIVATE_KEY);
     const transactionReceipt = await web3.eth.sendSignedTransaction(signedTransaction.rawTransaction);
     console.log('Transaction hash:', transactionReceipt.transactionHash);
-    contract.methods.totalSupply().call()
-    .then(function(result) {
-        console.log("Value of publicVar:", result);
-    })
-    .catch(function(error) {
-        console.error(error);
-    });
+    updatePoolData(contract)
 
-  }, [connectedAccount, contractApprove, liqABI, swapInAmount])
+  }, [connectedAccount, contractApprove, liqABI, swapLuckyInAmount, swapMikiInAmount, updatePoolData])
 
   useEffect(() => {
     clearTimeout(swapOutTimer.current)
     swapOutTimer.current = setTimeout( async() => {
-      if (!swapInAmount) {
-        setSwapOutAmount('')
+      if (!swapLuckyInAmount) {
+        setSwapLuckyOutAmount('')
         return
       }
       const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
       const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
-      const outAmount = await contract.methods.calculateSwapAmount(LUCKY_ADDRESS, swapInAmount).call()
-      setSwapOutAmount(Number(outAmount as any).toString())
+      const outAmount = await contract.methods.calculateSwapAmount(LUCKY_ADDRESS, swapLuckyInAmount).call()
+      setSwapLuckyOutAmount(Number(outAmount as any).toString())
     }, 1000)
-  }, [liqABI, swapInAmount])
+  }, [liqABI, swapLuckyInAmount])
+
+  useEffect(() => {
+    clearTimeout(swapOutTimer.current)
+    swapOutTimer.current = setTimeout( async() => {
+      if (!swapMikiInAmount) {
+        setSwapMikiOutAmount('')
+        return
+      }
+      const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
+      const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
+      const outAmount = await contract.methods.calculateSwapAmount(MIKI_ADDRESS, swapMikiInAmount).call()
+      setSwapMikiOutAmount(Number(outAmount as any).toString())
+    }, 1000)
+  }, [liqABI, swapMikiInAmount])
+
+  useEffect(() => {
+    const web3 = new Web3(REMOTE_CONTRACT_HTTP_URL)
+    const contract = new Contract(liqABI, REMOTE_CONTRACT_ADDRESS, web3)
+    updatePoolData(contract)
+  }, [liqABI, updatePoolData])
 
   return (
     <>
@@ -141,12 +178,31 @@ export default function Demo() {
       <div className="card">
         {/* Button to trigger Metamask connection */}
         <div>
-          <p>input lucky amount</p>
-          <input type="text" value={swapInAmount} onChange={onSwapInChange} />
-          <p>you will get: {swapOutAmount}</p>
+          <p>Lucky Amount: {poolData.luckyAmount}</p>
+          <p>Miki Amount: {poolData.mikiAmount}</p>
+          <p>Total Amount: {poolData.totalAmount}</p>
         </div>
-        <button onClick={() => swap()}>Swap Lucky to Miki</button>
+     </div>
+     <div style={{ display: 'flex', justifyContent: 'space-between'}}>
+      <div className="card">
+          {/* Button to trigger Metamask connection */}
+          <div>
+            <p>input Lucky amount</p>
+            <input type="text" value={swapLuckyInAmount} onChange={ev => setSwapLuckyInAmount(ev.target.value)} />
+            <p>you will get Miki amount: {swapLuckyOutAmount}</p>
+          </div>
+          <button onClick={() => swap('lucky')}>Swap Lucky to Miki</button>
         </div>
+        <div className="card">
+          {/* Button to trigger Metamask connection */}
+          <div>
+            <p>input Miki amount</p>
+            <input type="text" value={swapMikiInAmount} onChange={ev => setSwapMikiInAmount(ev.target.value)} />
+            <p>you will get Lucky amount: {swapMikiOutAmount}</p>
+          </div>
+          <button onClick={() => swap('miki')}>Swap Lucky to Miki</button>
+        </div>
+      </div>
      </div>
      <div>
       <h1>Add Liq</h1>

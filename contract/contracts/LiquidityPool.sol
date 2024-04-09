@@ -8,8 +8,10 @@ import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract LiquidityPool {
     address private tokenA;
     address private tokenB;
-    uint256 private fee = 100; // 1% 手续费，以百分比为单位
+    uint256 private fee = 200; // 2% 手续费，以百分比为单位
     uint256 public totalSupply; // 总供应量
+    uint256 public tokenAmount; // tokenA 数量
+    uint256 public tokenBmount; // tokenB 数量
 
     constructor(address _tokenA, address _tokenB) {
         require(_tokenA != address(0) && _tokenB != address(0), "Invalid token address");
@@ -37,6 +39,8 @@ contract LiquidityPool {
         require(ERC20(tokenB).transferFrom(msg.sender, address(this), amountB), "Transfer failed for tokenB");
 
         totalSupply += amountA + amountB;
+        tokenAmount += amountA;
+        tokenBmount += amountB;
     }
 
        // 移除流动性
@@ -57,57 +61,56 @@ contract LiquidityPool {
         return (amountA, amountB);
     }
 
-    function calculateSwapAmount(string memory tokenType, uint256 inputAmount) public view returns (uint256) {
+    function calculateSwapAmount(address tokenType, uint256 inputAmount) public view returns (uint256) {
         require(inputAmount > 0, "Input amount must be greater than 0");
-
+        
         uint256 poolBalanceTokenA = ERC20(tokenA).balanceOf(address(this));
         uint256 poolBalanceTokenB = ERC20(tokenB).balanceOf(address(this));
         require(poolBalanceTokenA > 0 && poolBalanceTokenB > 0, "Insufficient liquidity");
 
         uint256 outputAmount;
-
-        if (keccak256(abi.encodePacked(tokenType)) == keccak256(abi.encodePacked("tokenA"))) {
-            // 用户提供tokenA，计算tokenB的数量
-            uint256 feeAmount = getFee(inputAmount);
-            uint256 inputAmountAfterFee = inputAmount - feeAmount;
-            outputAmount = (inputAmountAfterFee * poolBalanceTokenB) / poolBalanceTokenA;
+        uint256 inputAmountWithFee = inputAmount - getFee(inputAmount);
+        if (tokenType == tokenA) {
+            uint256 newBalanceTokenA = poolBalanceTokenA + inputAmountWithFee;
+            uint256 newBalanceTokenB = (poolBalanceTokenA * poolBalanceTokenB) / newBalanceTokenA;
+            outputAmount = poolBalanceTokenB - newBalanceTokenB - 1;
         } else {
-            // 用户提供tokenB，计算tokenA的数量
-            uint256 feeAmount = getFee(inputAmount);
-            uint256 inputAmountAfterFee = inputAmount - feeAmount;
-            outputAmount = (inputAmountAfterFee * poolBalanceTokenA) / poolBalanceTokenB;
+            uint256 newBalanceTokenB = poolBalanceTokenB + inputAmountWithFee;
+            uint256 newBalanceTokenA = (poolBalanceTokenA * poolBalanceTokenB) / newBalanceTokenB;
+            outputAmount = poolBalanceTokenA - newBalanceTokenA - 1;
         }
 
-    return outputAmount;
-}
+        return outputAmount;
+    }
 
-    function swap(address userWallet, string memory tokenFrom, string memory tokenTo, uint256 amount) external returns (uint256) {
+
+    function swap(address userWallet, address tokenFrom, address tokenTo, uint256 amount) external returns (uint256) {
         address fromAddress;
         address toAddress;
 
-        if (keccak256(abi.encodePacked(tokenFrom)) == keccak256(abi.encodePacked("tokenA"))) {
+        if (tokenFrom == tokenA) {
             fromAddress = tokenA;
             toAddress = tokenB;
         } else {
             fromAddress = tokenB;
             toAddress = tokenA;
         }
-
         // 检查代币余额是否足够，并转移代币
         require(ERC20(fromAddress).balanceOf(userWallet) >= amount, "Insufficient balance");
-        require(ERC20(fromAddress).transferFrom(userWallet, address(this), amount), "Transfer failed for tokenFrom");
+        require(ERC20(fromAddress).transferFrom(msg.sender, address(this), amount), "Transfer failed for tokenFrom");
 
-        // 计算交换后的代币数量，考虑手续费
-        uint256 feeAmount = getFee(amount);
         uint256 amountOut = calculateSwapAmount(tokenFrom, amount);
 
         require(ERC20(toAddress).transfer(userWallet, amountOut), "Transfer failed for tokenTo");
 
-        if (feeAmount > 0) {
-            if (fromAddress != address(0)) {
-                require(ERC20(fromAddress).transfer(address(this), feeAmount), "Transfer failed for fee");
-            }
-        }
+        uint256 poolBalanceTokenA = ERC20(tokenA).balanceOf(address(this));
+        uint256 poolBalanceTokenB = ERC20(tokenB).balanceOf(address(this));
+
+        tokenAmount = poolBalanceTokenA;
+        tokenBmount = poolBalanceTokenB;
+
+        totalSupply = tokenBmount + tokenAmount;
+
 
         return amountOut;
     }
