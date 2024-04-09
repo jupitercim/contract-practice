@@ -1,13 +1,13 @@
 import { http, createConfig } from 'wagmi'
-import { base, mainnet, bsc } from 'wagmi/chains'
+import { base, mainnet, bsc, goerli } from 'wagmi/chains'
 
 export const config = createConfig({
-  chains: [mainnet, base],
+  chains: [mainnet, base, goerli],
   connectors: [
   ],
   transports: {
     [mainnet.id]: http(),
     [base.id]: http(),
-    [bsc.id]: http(),
+    [goerli.id]: http(),
   },
 })
