@@ -1,27 +1,42 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// import "./LiquidityPoolFactory.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 // import "./LuckyToken.sol";
 // import "./MikiToken.sol";
 
 contract LiquidityPool {
-    address private tokenA;
-    address private tokenB;
+    address public factory;
+    address public tokenA;
+    address public tokenB;
     uint256 private fee = 2; // 2% 手续费，以百分比为单位
     uint256 public totalSupply; // 总供应量
-    uint256 public reserve0; // tokenA 数量
-    uint256 public reserve1; // tokenB 数量
+    uint256 private reserve0; // tokenA 数量
+    uint256 private reserve1; // tokenB 数量
+    uint256 private tokenAAmount; // tokenA 数量
+    uint256 private tokenBAmount; // tokenB 数量
 
+    // constructor() public {
+    //     factory = msg.sender;
+    // }
+
+    // function initialize(address _tokenA, address _tokenB) external {
+    //     require(msg.sender == factory, 'FORBIDDEN'); // sufficient check
+    //     tokenA = _tokenA;
+    //     tokenB = _tokenB;
+    // }
     constructor(address _tokenA, address _tokenB) {
         require(_tokenA != address(0) && _tokenB != address(0), "Invalid token address");
         tokenA = _tokenA;
         tokenB = _tokenB;
     }
 
-    // 获取手续费
-    function getFee(uint256 amount) public view returns (uint256) {
-        return (amount * fee) / 100; // 计算手续费，以百分比为单位，需要除以10000
+    function getReserves() public view returns (uint256 _reserve0, uint256 _reserve1, uint256 _tokenAAmount, uint256 _tokenBAmount) {
+        _reserve0 = reserve0;
+        _reserve1 = reserve1;
+        _tokenAAmount = tokenAAmount;
+        _tokenBAmount = tokenBAmount;
     }
 
     function _update(uint balance0, uint balance1) private {
@@ -87,16 +102,21 @@ contract LiquidityPool {
         require(tokenFrom == tokenA || tokenFrom == tokenB, "Invalid tokenFrom address");
         require(tokenTo == tokenA || tokenTo == tokenB, "Invalid tokenTo address");
         require(tokenFrom != tokenTo, "tokenFrom and tokenTo must be different");
-
         require(ERC20(tokenFrom).balanceOf(userWallet) >= amount, "Insufficient balance");
-        require(ERC20(tokenFrom).transferFrom(msg.sender, address(this), amount), "Transfer failed for tokenFrom");
+
         uint256 poolBalanceTokenA = ERC20(tokenA).balanceOf(address(this));
         uint256 poolBalanceTokenB = ERC20(tokenB).balanceOf(address(this));
+
+        require(ERC20(tokenFrom).transferFrom(msg.sender, address(this), amount), "Transfer failed for tokenFrom");
+
         uint256 balance0;
         uint256 balance1;
 
         (uint256 amountOut,) = calculateSwapAmount(tokenFrom, amount);
         require(ERC20(tokenTo).transfer(userWallet, amountOut), "Transfer failed for tokenTo");
+
+        uint256 _balance0 = ERC20(tokenA).balanceOf(address(this));
+        uint256 _balance1 = ERC20(tokenB).balanceOf(address(this));
 
         if (tokenFrom == tokenA) {
             balance0 = poolBalanceTokenA + amount;
@@ -105,6 +125,9 @@ contract LiquidityPool {
             balance0 = poolBalanceTokenA - amountOut;
             balance1 = poolBalanceTokenB + amount;
         }
+
+        tokenAAmount = _balance0;
+        tokenBAmount = _balance1;
 
         _update(balance0, balance1);
     }

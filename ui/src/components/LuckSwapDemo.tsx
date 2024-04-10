@@ -34,14 +34,14 @@ export default function Demo() {
   }, [])
 
   const updatePoolData = useCallback( async (contract: Contract<any>) => {
-    const [luckyAmount, mikiAmount, totalAmount] = await Promise.all([
-      contract.methods.reserve0().call(),
-      contract.methods.reserve1().call(),
+    const [amount, totalAmount] = await Promise.all([
+      contract.methods.getReserves().call(),
       contract.methods.totalSupply().call()
     ])
+    console.log(amount['0'],amount['1'],amount['2'],amount['3'],)
     setPoolData({
-      luckyAmount: Number(luckyAmount),
-      mikiAmount: Number(mikiAmount),
+      luckyAmount: Number(amount['0']),
+      mikiAmount: Number(amount['1']),
       totalAmount: Number(totalAmount)
     })
   }, [])
